@@ -18,11 +18,8 @@ RUN apt-get clean && apt-get autoremove
 
 WORKDIR "/tmp"
 RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.12.8/signal-cli-0.12.8.tar.gz -O signal-cli-0.12.8.tar.gz
-#RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.10.9/signal-cli-0.10.9-Linux.tar.gz -O signal-cli-0.10.9.tar.gz
 RUN tar zxf signal-cli-0.12.8.tar.gz
 RUN mv signal-cli-0.12.8  /opt/signal
-#RUN wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/amd64-glibc2.28-0.11.2/libsignal_jni.so
-#RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.39.3/libsignal_jni.so-v0.39.3-x86_64-unknown-linux-gnu.tar.gz
 RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.36.1/libsignal_jni.so-v0.36.1-x86_64-unknown-linux-gnu.tar.gz
 RUN tar zxf libsignal_jni.so-v0.36.1-x86_64-unknown-linux-gnu.tar.gz
 RUN zip -u /opt/signal/lib/libsignal-client-*.jar libsignal_jni.so
