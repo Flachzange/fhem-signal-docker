@@ -1,4 +1,4 @@
-FROM ghcr.io/fhem/fhem/fhem-docker:bullseye
+FROM ghcr.io/fhem/fhem-docker:3-bullseye
 
 MAINTAINER holoarts<holoarts@yahoo.com>
 
