@@ -1,4 +1,4 @@
-FROM ghcr.io/fhem/fhem-docker:4-bullseye
+FROM ghcr.io/fhem/fhem-docker:3-bullseye
 
 MAINTAINER holoarts<holoarts@yahoo.com>
 
@@ -11,12 +11,14 @@ ENV TERM xterm
 #RUN ping 8.8.8.8
 #RUN cat /etc/resolv.conf
 RUN apt-get update
-RUN apt-get -q -y install openjdk-21-jre-headless
+#RUN apt-get -q -y install openjdk-21-jre-headless
 RUN apt-get -q -y install zip
 RUN apt-get clean && apt-get autoremove
 
 
 WORKDIR "/tmp"
+RUN wget http://ftp.de.debian.org/debian/pool/main/o/openjdk-21/openjdk-21-jdk-headless_21.0.4+7-3_amd64.deb
+RUN dpkg -i openjdk-21-jdk-headless_21.0.4+7-3_amd64.deb
 RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.13.5/signal-cli-0.13.5.tar.gz -O signal-cli-0.13.5.tar.gz
 RUN tar zxf signal-cli-0.13.5.tar.gz
 RUN mv signal-cli-0.13.5  /opt/signal
