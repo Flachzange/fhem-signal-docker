@@ -11,7 +11,7 @@ ENV TERM xterm
 #RUN ping 8.8.8.8
 #RUN cat /etc/resolv.conf
 RUN apt-get update
-RUN apt-get -q -y install openjdk-17-jre-headless
+RUN apt-get -q -y install openjdk-18-jre-headless
 RUN apt-get -q -y install zip
 RUN apt-get clean && apt-get autoremove
 
