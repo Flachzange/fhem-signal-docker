@@ -1,4 +1,4 @@
-FROM ghcr.io/fhem/fhem-docker:3-bullseye
+FROM ghcr.io/fhem/fhem-docker:3-pr-266-threaded-bullseye
 
 MAINTAINER holoarts<holoarts@yahoo.com>
 
@@ -6,10 +6,6 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm
 
 # Install dependencies
-#RUN ping 192.168.5.1
-#RUN ping 192.168.5.36
-#RUN ping 8.8.8.8
-#RUN cat /etc/resolv.conf
 RUN apt-get update
 #RUN apt-get -q -y install openjdk-21-jre-headless
 RUN apt-get -q -y install zip
@@ -23,16 +19,12 @@ RUN wget https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21
 RUN tar zxf OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
 RUN mv jdk* java
 RUN rm OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
-RUN JAVA_NATIVE=no
-RUN export JAVA_HOME=/opt/java
 
 WORKDIR "/tmp"
 RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.13.5/signal-cli-0.13.5.tar.gz -O signal-cli-0.13.5.tar.gz
 RUN tar zxf signal-cli-0.13.5.tar.gz
 RUN mv signal-cli-0.13.5  /opt/signal
-#RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.47.0/libsignal_jni.so-v0.47.0-x86_64-unknown-linux-gnu.tar.gz
 RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.52.2/libsignal_jni.so-v0.52.2-x86_64-unknown-linux-gnu.tar.gz
-#RUN tar zxf libsignal_jni.so-v0.47.0-x86_64-unknown-linux-gnu.tar.gz
 RUN tar zxf libsignal_jni.so-v0.52.2-x86_64-unknown-linux-gnu.tar.gz
 RUN zip -u /opt/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
@@ -42,7 +34,5 @@ RUN cpan install Protocol::DBus
 COPY org.asamk.Signal.conf /etc/dbus-1/system.d/org.asamk.Signal.conf
 COPY org.asamk.Signal.service /usr/share/dbus-1/system-services/org.asamk.Signal.service
 COPY pre-start.sh /docker/
-
-#RUN /opt/signal/bin/signal-cli --config /var/lib/signal-cli
 
 # End Dockerfile
