@@ -16,9 +16,17 @@ RUN apt-get -q -y install zip
 RUN apt-get clean && apt-get autoremove
 
 
+WORKDIR "/opt"
+#RUN wget https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.deb
+#RUN dpkg -i jdk-21_linux-x64_bin.deb
+RUN wget https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.3%2B9/OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
+RUN tar zxf OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
+RUN mv jdk* java
+RUN rm OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
+RUN JAVA_NATIVE=no
+RUN export JAVA_HOME=/opt/java
+
 WORKDIR "/tmp"
-RUN wget https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.deb
-RUN dpkg -i jdk-21_linux-x64_bin.deb
 RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.13.5/signal-cli-0.13.5.tar.gz -O signal-cli-0.13.5.tar.gz
 RUN tar zxf signal-cli-0.13.5.tar.gz
 RUN mv signal-cli-0.13.5  /opt/signal
