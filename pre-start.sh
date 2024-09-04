@@ -23,6 +23,10 @@ echo -n "Waiting for dbus to become ready."
 	echo "($CHECK), running"
 
 echo "Setting path"
+sudo tee -a  /etc/profile.d/jdk21.sh<<EOF
+export JAVA_HOME=/opt/java
+export PATH=\$PATH:\$JAVA_HOME/bin
+EOF
 export JAVA_HOME=/opt/java
 export PATH=$PATH:$JAVA_HOME/bin
 echo "JAVA HOME: " $JAVA_HOME 
