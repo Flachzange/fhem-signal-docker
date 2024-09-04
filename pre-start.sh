@@ -33,16 +33,16 @@ echo "JAVA HOME: " $JAVA_HOME
 echo "Starting signal_cli"
 chown fhem.fhem /var/lib/signal-cli                               
 sudo -i -u fhem /opt/signal/bin/signal-cli --config /var/lib/signal-cli daemon --system  >>/var/log/signal.log 2>>/var/log/signal.err &
-echo -n "Waiting for signal-cli to become ready."
-    WAIT='grep -i "DBus daemon running" /var/log/signal.err' 
-    CHECK=`grep -i "DBus daemon running" /var/log/signal.err`
-		while [ -z "$CHECK" ]
-		do
-			echo -n "."
-			sleep 1
-            CHECK=`grep -i "DBus daemon running" /var/log/signal.err`
-		done
-	echo "($CHECK), running"
+#echo -n "Waiting for signal-cli to become ready."
+#    WAIT='grep -i "DBus daemon running" /var/log/signal.err' 
+#   CHECK=`grep -i "DBus daemon running" /var/log/signal.err`
+	#	while [ -z "$CHECK" ]
+		#do
+			#echo -n "."
+			#sleep 1
+            #CHECK=`grep -i "DBus daemon running" /var/log/signal.err`
+#		done
+#	echo "($CHECK), running"
 
  
  
