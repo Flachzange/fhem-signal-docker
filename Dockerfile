@@ -17,14 +17,14 @@ RUN apt-get clean && apt-get autoremove
 
 
 WORKDIR "/tmp"
-RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.12.8/signal-cli-0.12.8.tar.gz -O signal-cli-0.12.8.tar.gz
-RUN tar zxf signal-cli-0.12.8.tar.gz
-RUN mv signal-cli-0.12.8  /opt/signal
-RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.36.1/libsignal_jni.so-v0.36.1-x86_64-unknown-linux-gnu.tar.gz
-RUN tar zxf libsignal_jni.so-v0.36.1-x86_64-unknown-linux-gnu.tar.gz
+RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.13.5/signal-cli-0.13.5.tar.gz -O signal-cli-0.13.5.tar.gz
+RUN tar zxf signal-cli-0.13.5.tar.gz
+RUN mv signal-cli-0.13.5  /opt/signal
+RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.56.1/libsignal_jni.so-v0.56.1-x86_64-unknown-linux-gnu.tar.gz
+RUN tar zxf libsignal_jni.so-v0.56.1-x86_64-unknown-linux-gnu.tar.gz
 RUN zip -u /opt/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
-RUN rm -f signal-cli-0.12.8.tar.gz libsignal_jni.so
+RUN rm -f signal-cli-0.13.5.tar.gz libsignal_jni.so
 RUN cpan install Protocol::DBus
 
 COPY org.asamk.Signal.conf /etc/dbus-1/system.d/org.asamk.Signal.conf
