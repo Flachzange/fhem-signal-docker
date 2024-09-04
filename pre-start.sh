@@ -22,6 +22,8 @@ echo -n "Waiting for dbus to become ready."
 		done
 	echo "($CHECK), running"
 
+JAVA_NATIVE=no
+export JAVA_HOME=/opt/java
 echo "Starting signal_cli"
 chown fhem.fhem /var/lib/signal-cli                               
 sudo -u fhem /opt/signal/bin/signal-cli --config /var/lib/signal-cli daemon --system  >>/var/log/signal.log 2>>/var/log/signal.err &
