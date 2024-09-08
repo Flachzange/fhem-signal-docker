@@ -30,6 +30,7 @@ RUN zip -u /opt/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
 RUN rm -f signal-cli-0.13.5.tar.gz libsignal_jni.so
 RUN cpan install Protocol::DBus
+RUN cpan install Math::Round
 
 COPY org.asamk.Signal.conf /etc/dbus-1/system.d/org.asamk.Signal.conf
 COPY org.asamk.Signal.service /usr/share/dbus-1/system-services/org.asamk.Signal.service
