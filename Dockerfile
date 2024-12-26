@@ -1,5 +1,5 @@
 #FROM ghcr.io/fhem/fhem-docker:pr-266-threaded-bullseye
-FROM fhem/fhem:pr-266-bullseye
+FROM ghcr.io/fhem/fhem-docker:4.0.5-threaded-bullseye
 
 MAINTAINER holoarts<holoarts@yahoo.com>
 
