@@ -1,6 +1,4 @@
-#FROM ghcr.io/fhem/fhem-docker:pr-266-threaded-bullseye
-#FROM ghcr.io/fhem/fhem-docker:4.0.5-threaded-bullseye
-FROM ghcr.io/fhem/fhem-docker:5.0.0-beta2-threaded-bookworm
+FROM ghcr.io/fhem/fhem-docker:5-threaded-bookworm
 
 MAINTAINER holoarts<holoarts@yahoo.com>
 
