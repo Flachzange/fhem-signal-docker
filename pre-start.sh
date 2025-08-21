@@ -31,7 +31,8 @@ EOF
 #export PATH=$PATH:$JAVA_HOME/bin
 echo "JAVA HOME: " $JAVA_HOME 
 echo "Starting signal_cli"
-chown fhem.fhem /var/lib/signal-cli                               
+chown fhem:fhem /var/lib/signal-cli                               
+touch /var/log/signal.err
 sudo -i -u fhem /opt/signal/bin/signal-cli --config /var/lib/signal-cli daemon --system  >>/var/log/signal.log 2>>/var/log/signal.err &
 echo -n "Waiting for signal-cli to become ready."
     WAIT='grep -i "Started DBus server on SYSTEM bus" /var/log/signal.err' 
