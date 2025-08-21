@@ -6,7 +6,9 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm
 
 # Install dependencies
-RUN sudo dpkg --configure -a
+
+RUN set -eux; \
+    unset PERL5LIB PERL_LOCAL_LIB_ROOT PERL_MB_OPT PERL_MM_OPT PERL5OPT || true; 
 RUN apt-get update
 RUN apt-get -q -y install zip nano gcc python-is-python3 libjson-perl libwww-perl libsoap-lite-perl libjson-xs-perl libany-uri-escape-perl libtext-iconv-perl libencode-perl libmp3-info-perl mp3wrap sox libsox-fmt-mp3 libreadonlyx-perl
 RUN apt-get clean && apt-get autoremove
