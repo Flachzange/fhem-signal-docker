@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm
 
 # Install dependencies
+RUN sudo dpkg --configure -a
 RUN apt-get update
 RUN apt-get -q -y install zip nano gcc python-is-python3 x11-common libxss1 libjson-perl libwww-perl libsoap-lite-perl libjson-xs-perl libany-uri-escape-perl libtext-iconv-perl libencode-perl libmp3-info-perl mp3wrap sox libsox-fmt-mp3 libreadonlyx-perl
 RUN apt-get clean && apt-get autoremove
