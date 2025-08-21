@@ -12,7 +12,7 @@ RUN apt-get update
 RUN apt-get -q -y install zip nano gcc tcpdump python-is-python3 libjson-perl libwww-perl libsoap-lite-perl libjson-xs-perl libany-uri-escape-perl libtext-iconv-perl libencode-perl libmp3-info-perl mp3wrap sox libsox-fmt-mp3 libreadonlyx-perl
 RUN apt-get clean && apt-get autoremove
 
-RUN cpm install --show-build-log-on-failure --configure-timeout=360 --workers=$(nproc) --local-lib-contained /usr/src/app/3rdparty/  Readonly::XS List::MoreUtils Crypt::Rijndael Crypt::Random LWP::UserAgent MIME::Base64 Time::HiRes Digest::MD5 base IO::File Net::SIP
+RUN cpm install --show-build-log-on-failure --configure-timeout=360 --workers=$(nproc) --local-lib-contained /usr/src/app/3rdparty/  Readonly::XS List::MoreUtils Crypt::Rijndael Crypt::Random LWP::UserAgent MIME::Base64 Time::HiRes Digest::MD5 base IO::File Net::SIP Protocol::DBus Math::Round
 
 
 WORKDIR "/opt"
@@ -30,8 +30,6 @@ RUN tar zxf libsignal_jni.so-v0.76.4-x86_64-unknown-linux-gnu.tar.gz
 RUN zip -u /opt/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
 RUN rm -f signal-cli-0.13.18.tar.gz libsignal_jni.so
-RUN cpan install Protocol::DBus
-RUN cpan install Math::Round
 
 COPY org.asamk.Signal.conf /etc/dbus-1/system.d/org.asamk.Signal.conf
 COPY org.asamk.Signal.service /usr/share/dbus-1/system-services/org.asamk.Signal.service
