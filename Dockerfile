@@ -25,11 +25,13 @@ WORKDIR "/tmp"
 RUN wget -qN https://github.com/AsamK/signal-cli/releases/download/v0.14.5/signal-cli-0.14.5.tar.gz -O signal-cli-0.14.5.tar.gz
 RUN tar zxf signal-cli-0.14.5.tar.gz
 RUN mv signal-cli-0.14.5  /opt/signal
-RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.94.4/libsignal_jni.so-v0.94.4-x86_64-unknown-linux-gnu.tar.gz
-RUN tar zxf libsignal_jni.so-v0.94.4-x86_64-unknown-linux-gnu.tar.gz
+RUN wget -qN https://github.com/exquo/signal-libs-build/releases/download/libsignal_v0.96.0/libsignal_jni.so-v0.96.0-x86_64-unknown-linux-gnu.tar.gz
+RUN tar zxf libsignal_jni.so-v0.96.0-x86_64-unknown-linux-gnu.tar.gz
 RUN zip -u /opt/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
 RUN rm -f signal-cli-0.14.5.tar.gz libsignal_jni.so
+
+RUN chmod 1777 /tmp
 
 COPY org.asamk.Signal.conf /etc/dbus-1/system.d/org.asamk.Signal.conf
 COPY org.asamk.Signal.service /usr/share/dbus-1/system-services/org.asamk.Signal.service
