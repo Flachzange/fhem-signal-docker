@@ -1,9 +1,9 @@
 FROM ghcr.io/fhem/fhem-docker:5-threaded-bookworm
 
-MAINTAINER holoarts<holoarts@yahoo.com>
+LABEL org.opencontainers.image.authors="holoarts<holoarts@yahoo.com>"
 
-ENV DEBIAN_FRONTEND noninteractive
-ENV TERM xterm
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=xterm
 
 # Install dependencies
 
