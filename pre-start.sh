@@ -1,51 +1,34 @@
 #!/bin/bash
-#$Id:$
-
-SCRIPTVERSION="0.1"
-# Author: Holoarts
-# License: GPL
-#start script for signal-cli within fhem docker
-
-
-
-service dbus start
-echo -n "Waiting for dbus to become ready."
-    WAIT="service dbus status | grep -i 'dbus is running'"
-    echo $WAIT
-    CHECK=`$WAIT`
-		while [ -z "$CHECK" ]
-		do
-			echo -n "."
-			sleep 1
-            CHECK=`$WAIT`
-            echo $CHECK
-		done
-	echo "($CHECK), running"
-
-echo "Setting path"
-sudo tee -a  /etc/profile.d/jdk21.sh<<EOF
+# Original integration: Holoarts, GPL.
+# Start the components already installed in the image; no runtime downloads.
+set -euo pipefail
 export JAVA_HOME=/opt/java
-export PATH=\$PATH:\$JAVA_HOME/bin
-EOF
-#export JAVA_HOME=/opt/java
-#export PATH=$PATH:$JAVA_HOME/bin
-echo "JAVA HOME: " $JAVA_HOME 
-echo "Starting signal_cli"
-chown fhem:fhem /var/lib/signal-cli                               
-touch /var/log/signal.err
-sudo -i -u fhem /opt/signal/bin/signal-cli --config /var/lib/signal-cli daemon --system  >>/var/log/signal.log 2>>/var/log/signal.err &
-echo -n "Waiting for signal-cli to become ready."
-    WAIT='grep -i "Started DBus server on SYSTEM bus" /var/log/signal.err' 
-   CHECK=`grep -i "Started DBus server on SYSTEM bus" /var/log/signal.err`
-		while [ -z "$CHECK" ]
-		do
-			echo -n "."
-			sleep 1
-            CHECK=`grep -i "Started DBus server on SYSTEM bus" /var/log/signal.err`
-		done
-	echo "($CHECK), running"
+export PATH="$JAVA_HOME/bin:$PATH"
+service dbus start
+mkdir -p /var/lib/signal-cli
+chown fhem:fhem /var/lib/signal-cli
+touch /var/log/signal.log /var/log/signal.err
+sudo -u fhem env JAVA_HOME="$JAVA_HOME" PATH="$PATH" \
+    /opt/signal/bin/signal-cli --config /var/lib/signal-cli daemon --system \
+    >> /var/log/signal.log 2>> /var/log/signal.err &
+signal_pid=$!
 
- 
- 
-
-
+for ((attempt=0; attempt<60; attempt++)); do
+    if ! kill -0 "$signal_pid" 2>/dev/null; then
+        echo "signal-cli exited during startup" >&2
+        tail -n 50 /var/log/signal.err >&2
+        exit 1
+    fi
+    if dbus-send --system --print-reply --reply-timeout=1000 \
+        --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus.NameHasOwner string:org.asamk.Signal \
+        2>/dev/null | grep -q 'boolean true'; then
+        echo "signal-cli is ready on the system D-Bus"
+        exit 0
+    fi
+    sleep 1
+done
+echo "signal-cli did not become ready within 60 seconds" >&2
+tail -n 50 /var/log/signal.err >&2
+kill "$signal_pid" 2>/dev/null || true
+exit 1
