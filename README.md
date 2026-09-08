@@ -56,9 +56,16 @@ image-build time. The existing offline tests gate publication as before.
 ## Publication and checks
 
 PRs and manual runs on feature branches build and test without publishing.
-Successful main builds publish ghcr.io/flachzange/fhem-signal-docker:main and
-:latest; scheduled builds additionally refresh :nightly. Release-tag builds
-publish their Git tag. Every published build also has a build-<fingerprint>-<run-id>-<attempt> tag.
+Successful main builds, including scheduled builds, publish
+ghcr.io/flachzange/fhem-signal-docker:automated.
+Release-tag builds publish automated-<git-tag> (for example automated-v1.0.0).
+Every published build also has an automated-build-<fingerprint>-<run-id>-<attempt>
+tag. A validation step rejects any tag outside this automated namespace.
+
+The existing main, latest, nightly and unprefixed version tags are not overwritten
+or deleted by this workflow. After merging, this workflow updates only the new
+automated tags; it does not continue building the legacy image. Existing containers
+using an old tag remain on that tag until you explicitly change their configuration.
 The existing cosign signing is retained.
 
 The exact locally tested image is pushed, rather than rebuilding it for publication.
@@ -106,7 +113,7 @@ the dependency manifest does not lock the Debian/CPAN package repositories.
 
 The included docker-compose.yml is a local example with FHEM and Signal data
 volumes. Run the resolver before docker compose build. To use the published
-image, replace build: . with image: ghcr.io/flachzange/fhem-signal-docker:main
+image, replace build: . with image: ghcr.io/flachzange/fhem-signal-docker:automated
 in your own Compose configuration. Dockerfile.x86 is a legacy file and is not
 used by the automated workflow; use Dockerfile for amd64.
 

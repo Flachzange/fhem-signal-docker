@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .build/published.json
-          key: published-amd64-${{ steps.deps.outputs.fingerprint }}
+          key: published-automated-amd64-${{ steps.deps.outputs.fingerprint }}
           lookup-only: true
       - name: Decide whether to build
         id: decide
@@ -100,12 +100,23 @@ jobs:
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=schedule,pattern=nightly
-            type=ref,event=tag
-            type=raw,value=build-${{ steps.deps.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
+            type=raw,value=automated,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=tag,prefix=automated-
+            type=raw,value=automated-build-${{ steps.deps.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
           flavor: latest=false
+      - name: Validate isolated publication tags
+        if: steps.decide.outputs.build == 'true'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          test -n "$TAGS"
+          while IFS= read -r tag; do
+            case "$tag" in
+              "$IMAGE":automated|"$IMAGE":automated-*) ;;
+              *) echo "Refusing publication outside automated tags: $tag" >&2; exit 1 ;;
+            esac
+          done <<< "$TAGS"
       - name: Log into GHCR
         if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v4
@@ -146,7 +157,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .build/published.json
-          key: published-amd64-${{ steps.deps.outputs.fingerprint }}
+          key: published-automated-amd64-${{ steps.deps.outputs.fingerprint }}
 
   propose-base-update:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
