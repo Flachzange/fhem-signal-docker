@@ -3,7 +3,9 @@ name: Docker
 on:
   workflow_dispatch:
   schedule:
-    - cron: '20 21 * * *'
+    - cron: '20 21 * * 1-6'
+    # Sunday: rebuild without cache even when upstream releases are unchanged.
+    - cron: '20 21 * * 0'
   push:
     branches: [main]
     tags: ['v*.*.*']
@@ -56,8 +58,9 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           HIT: ${{ steps.published.outputs.cache-hit }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
-          if [[ "$EVENT" != schedule || "$HIT" != true ]]; then
+          if [[ "$EVENT" != schedule || "$SCHEDULE" == "20 21 * * 0" || "$HIT" != true ]]; then
             echo 'build=true' >> "$GITHUB_OUTPUT"
           else
             echo 'build=false' >> "$GITHUB_OUTPUT"
@@ -72,8 +75,10 @@ jobs:
           load: true
           push: false
           tags: fhem-signal-candidate:test
+          no-cache: ${{ github.event.schedule == '20 21 * * 0' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
           build-args: |
             BASE_IMAGE=${{ steps.deps.outputs.base_image }}
+            APT_REFRESH_PERIOD=${{ steps.deps.outputs.apt_refresh_period }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Test candidate offline with fresh, disposable data
@@ -99,7 +104,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=schedule,pattern=nightly
             type=ref,event=tag
-            type=raw,value=build-${{ steps.deps.outputs.fingerprint }}
+            type=raw,value=build-${{ steps.deps.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
           flavor: latest=false
       - name: Log into GHCR
         if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))

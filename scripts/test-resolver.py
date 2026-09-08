@@ -1,3 +1,4 @@
+from datetime import date
 import importlib.util
 from pathlib import Path
 import unittest
@@ -9,6 +10,14 @@ spec.loader.exec_module(resolver)
 
 
 class ResolverTests(unittest.TestCase):
+    def test_weekly_refresh_changes_on_sunday(self):
+        self.assertEqual(resolver.apt_refresh_period(date(2026, 9, 12)), "2026-09-06")
+        self.assertEqual(resolver.apt_refresh_period(date(2026, 9, 13)), "2026-09-13")
+        self.assertEqual(resolver.apt_refresh_period(date(2026, 9, 14)), "2026-09-13")
+
+    def test_weekly_refresh_survives_year_boundary(self):
+        self.assertEqual(resolver.apt_refresh_period(date(2027, 1, 1)), "2026-12-27")
+
     def test_java_requirement_ignores_other_numbers(self):
         text = "signal-cli 0.14.7\n- at least Java Runtime Environment (JRE) 25\nJava 21 examples"
         self.assertEqual(resolver.java_major(text), 25)

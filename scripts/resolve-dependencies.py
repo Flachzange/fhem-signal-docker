@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Resolve upstream releases and prepare verified build inputs; never run installers."""
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -74,6 +75,14 @@ def base_reference():
     ), "base image ARG")
 
 
+def apt_refresh_period(today=None):
+    """Sunday-based UTC week; failed weekly builds stay due on later days."""
+    if today is None:
+        today = datetime.now(timezone.utc).date()
+    sunday = today - timedelta(days=(today.weekday() + 1) % 7)
+    return sunday.isoformat()
+
+
 def prepare():
     OUT.mkdir(exist_ok=True)
     release = get_json("https://api.github.com/repos/AsamK/signal-cli/releases/latest")
@@ -128,6 +137,7 @@ def prepare():
                  "base image digest")
     lock = {
         "schema": 1, "platform": "linux/amd64",
+        "apt_refresh_period": apt_refresh_period(),
         "base": {"tag": base, "digest": digest, "image": base + "@" + digest},
         "signal": {"version": version, "commit": source, **signal},
         "libsignal": {"version": libversion, **native},
@@ -146,6 +156,7 @@ def prepare():
             stream.write(lock[key]["sha256"] + "  " + name + "\n")
     outputs = {
         "base_image": lock["base"]["image"],
+        "apt_refresh_period": lock["apt_refresh_period"],
         "fingerprint": fingerprint,
         "signal_version": version,
     }

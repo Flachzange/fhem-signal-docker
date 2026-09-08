@@ -32,12 +32,33 @@ publication. A missing/evicted success cache merely causes an extra build.
 Pushes, PRs and manual runs always build. Debian and CPAN packages are resolved
 during a build; they are not fully locked by dependencies.json.
 
+### Weekly Debian package refresh
+
+Every Sunday at 21:20 UTC the workflow builds without Docker layer cache.
+APT updates its package indexes and upgrades all installed APT-managed packages
+within the configured Debian release, including packages inherited from the FHEM
+base. The additional packages are then installed. Existing modified configuration
+files are preserved. This does not switch Debian releases or upgrade manually
+installed Java/signal-cli through APT.
+
+The dependency fingerprint includes a Sunday-based UTC week. This forces a new
+build even with unchanged upstream versions/digest. If the Sunday run fails or is
+missed, the following daily run still sees an unpublished weekly fingerprint and
+retries. The same weekly value invalidates the Docker APT layer, so retries cannot
+reuse the previous week's package layer. A successful build is marked only after
+publication and signing. APT upgrade errors stop the build.
+
+Manual workflow runs and PR checks also disable Docker layer cache. Every build
+that actually executes the APT layer performs the upgrade. Sunday is 22:20 CET or
+23:20 CEST; GitHub's scheduled start may be delayed. All installation happens at
+image-build time. The existing offline tests gate publication as before.
+
 ## Publication and checks
 
 PRs and manual runs on feature branches build and test without publishing.
 Successful main builds publish ghcr.io/flachzange/fhem-signal-docker:main and
 :latest; scheduled builds additionally refresh :nightly. Release-tag builds
-publish their Git tag. Every published build also has a build-<fingerprint> tag.
+publish their Git tag. Every published build also has a build-<fingerprint>-<run-id>-<attempt> tag.
 The existing cosign signing is retained.
 
 The exact locally tested image is pushed, rather than rebuilding it for publication.
@@ -77,7 +98,7 @@ Requires Docker with Buildx, Python 3.11+ and curl. GH_TOKEN is optional and rai
 the GitHub API rate limit. From a clean checkout:
 
     python3 scripts/resolve-dependencies.py
-    docker build --build-arg BASE_IMAGE="$(python3 -c 'import json; print(json.load(open(".build/dependencies.json"))["base"]["image"])')" -t fhem-signal:test .
+    docker build --no-cache --build-arg BASE_IMAGE="$(python3 -c 'import json; print(json.load(open(".build/dependencies.json"))["base"]["image"])')" -t fhem-signal:test .
 
 The resolver prepares .build (ignored by Git). Plain docker build requires these
 prepared inputs. To repeat a historical image exactly, pull its immutable digest;
