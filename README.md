@@ -1,29 +1,104 @@
-# Extension for FHEM-docker installation to communicate with Signal
+# FHEM Docker with Signalbot support
 
-Files to build a docker image with Signal support via Signalbot (Integration for signal messenger) and signal-cli (https://github.com/AsamK/signal-cli). At the moment it only tested on a Rapberrypi (ARM). On x86 architure use Dockerfile.x86 .
+Extends ghcr.io/fhem/fhem-docker:5-threaded-bookworm with signal-cli,
+Temurin Java, a compatible libsignal JNI library, and the existing additional
+Debian/Perl packages. The automated build targets **linux/amd64** (TrueNAS x86-64).
 
-The original fhem/fhem-docker image is used, see the documentation at https://github.com/fhem/fhem-docker/ . 
+## Automatic updates
 
-## Usage
+The Docker workflow checks upstream daily at 21:20 UTC and can be started manually.
+It resolves:
 
-* clone files 
-* cd into this directory
-* run `docker-compose up -d`
-* go to http://`your hostname`:8083
-* define a new entity with  `define signal Signalbot`
+- The latest stable release from AsamK/signal-cli (no prereleases).
+- The Java major required by the README at that release's exact commit.
+- The latest stable Linux x64 Temurin JDK patch for that Java major.
+- The libsignal version from libsignal-client-<version>.jar in the release archive.
+- That exact JNI release from exquo/signal-libs-build.
+- The current digest of the explicitly selected FHEM base tag.
 
+There is no dependency on the Signalbot author's installation script and no
+installation/download during container startup. A missing JNI release, changed
+README format, checksum mismatch, or failing smoke test prevents publication.
+Failed combinations are retried on the next scheduled run.
 
-## more info
+Each build stores dependencies.json as a workflow artifact and in the image at
+/opt/signal/dependencies.json. It records versions, source commit, download URLs,
+SHA-256 hashes, base digest and repository revision. Upstream asset hashes are
+verified where provided; computed hashes alone are not publisher signatures.
+The build verifies the downloaded inputs again before installation.
 
-See the FHEM Wiki (German) for the usage of Signalbot.
-https://wiki.fhem.de/wiki/Signalbot
+A fingerprint of these inputs avoids scheduled rebuilds after successful
+publication. A missing/evicted success cache merely causes an extra build.
+Pushes, PRs and manual runs always build. Debian and CPAN packages are resolved
+during a build; they are not fully locked by dependencies.json.
 
-See FHEM Forum (German) for more details
-https://forum.fhem.de/index.php/topic,118370.0.html
+## Publication and checks
 
+PRs and manual runs on feature branches build and test without publishing.
+Successful main builds publish ghcr.io/flachzange/fhem-signal-docker:main and
+:latest; scheduled builds additionally refresh :nightly. Release-tag builds
+publish their Git tag. Every published build also has a build-<fingerprint> tag.
+The existing cosign signing is retained.
 
-This extension is based on the work of https://github.com/bublath/FHEM-Signalbot.     
+The exact locally tested image is pushed, rather than rebuilding it for publication.
+Checks run without network access or production volumes:
 
-For source and license of the lib libsignal_jni.so see
-https://github.com/signalapp/libsignal-client
- 
+- Java and signal-cli startup.
+- Real libsignal JNI key generation and serialization round trip.
+- Loading Protocol::DBus and AI::FANN in Perl.
+- The actual pre-start hook and Signal D-Bus introspection with empty temporary data.
+
+These are compatibility smoke tests, not a test of message delivery or of every
+FHEM module. Updating the running TrueNAS container remains a separate operation.
+
+## FHEM base updates
+
+The Dockerfile explicitly selects the current image generation, threaded Perl,
+and Debian codename. Its digest is refreshed automatically.
+
+A separate job checks the threaded standard-image tags explicitly advertised in
+the upstream FHEM Docker README. New generations/Debian lanes become draft PRs;
+they are never automatically merged. This deliberately ignores undocumented
+registry/experimental tags. A previously declined proposal is not recreated.
+
+Enable **Settings → Actions → General → Allow GitHub Actions to create and
+approve pull requests** for automatic proposals. No additional secret or
+third-party update bot is required. PRs created using GITHUB_TOKEN usually do
+not trigger another workflow: run the Docker workflow manually on the proposal
+branch before merging. Unknown future Debian codenames require updating the
+ordering in scripts/propose-base-update.py.
+
+The image generation is not the FHEM application version. An existing /opt/fhem
+volume continues to use FHEM's own update mechanism.
+
+## Local build
+
+Requires Docker with Buildx, Python 3.11+ and curl. GH_TOKEN is optional and raises
+the GitHub API rate limit. From a clean checkout:
+
+    python3 scripts/resolve-dependencies.py
+    docker build --build-arg BASE_IMAGE="$(python3 -c 'import json; print(json.load(open(".build/dependencies.json"))["base"]["image"])')" -t fhem-signal:test .
+
+The resolver prepares .build (ignored by Git). Plain docker build requires these
+prepared inputs. To repeat a historical image exactly, pull its immutable digest;
+the dependency manifest does not lock the Debian/CPAN package repositories.
+
+The included docker-compose.yml is a local example with FHEM and Signal data
+volumes. Run the resolver before docker compose build. To use the published
+image, replace build: . with image: ghcr.io/flachzange/fhem-signal-docker:main
+in your own Compose configuration. Dockerfile.x86 is a legacy file and is not
+used by the automated workflow; use Dockerfile for amd64.
+
+Configure the FHEM module with:
+
+    define signal Signalbot
+
+## References
+
+- https://github.com/fhem/fhem-docker
+- https://github.com/AsamK/signal-cli
+- https://github.com/exquo/signal-libs-build
+- https://wiki.fhem.de/wiki/Signalbot
+
+Originally based on the integration work of Holoarts and Adimarantis:
+https://github.com/bublath/FHEM-Signalbot.

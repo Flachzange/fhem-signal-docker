@@ -1,0 +1,6 @@
+.git
+.github
+fhem
+signal
+__pycache__
+**/__pycache__

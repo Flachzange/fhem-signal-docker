@@ -5,65 +5,155 @@ on:
   schedule:
     - cron: '20 21 * * *'
   push:
-    branches: [ "main" ]
-    tags: [ 'v*.*.*' ]
+    branches: [main]
+    tags: ['v*.*.*']
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: docker-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
       id-token: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v3.9.2
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - name: Test dependency parsing and shell syntax
+        run: |
+          python3 scripts/test-resolver.py
+          bash -n pre-start.sh
+          bash -n scripts/install-signal.sh
+          bash -n scripts/smoke-test.sh
+          python3 -m py_compile scripts/*.py
+      - name: Resolve and download exact upstream dependencies
+        id: deps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/resolve-dependencies.py
+      - name: Keep dependency manifest for diagnosis and reproduction
+        uses: actions/upload-artifact@v4
         with:
-          cosign-release: 'v2.6.1'
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log into registry ${{ env.REGISTRY }}
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+          name: dependencies-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .build/dependencies.json
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Check last successful publication
+        id: published
+        uses: actions/cache/restore@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Build and push Docker image
-        id: build-and-push
+          path: .build/published.json
+          key: published-amd64-${{ steps.deps.outputs.fingerprint }}
+          lookup-only: true
+      - name: Decide whether to build
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          HIT: ${{ steps.published.outputs.cache-hit }}
+        run: |
+          if [[ "$EVENT" != schedule || "$HIT" != true ]]; then
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'build=false' >> "$GITHUB_OUTPUT"
+            echo 'Dependencies unchanged since successful publication.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Build candidate locally
+        if: steps.decide.outputs.build == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: fhem-signal-candidate:test
+          build-args: |
+            BASE_IMAGE=${{ steps.deps.outputs.base_image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Sign the published Docker image
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Test candidate offline with fresh, disposable data
+        if: steps.decide.outputs.build == 'true'
+        run: |
+          timeout 150 docker run --rm --network none \
+            --entrypoint /bin/bash \
+            --mount "type=bind,source=$PWD/scripts,target=/checks,readonly" \
+            fhem-signal-candidate:test /checks/smoke-test.sh
+      - name: Set registry name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Extract image tags
+        id: meta
+        if: steps.decide.outputs.build == 'true'
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=schedule,pattern=nightly
+            type=ref,event=tag
+            type=raw,value=build-${{ steps.deps.outputs.fingerprint }}
+          flavor: latest=false
+      - name: Log into GHCR
+        if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the tested candidate
+        id: push
+        if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+        run: |
+          while IFS= read -r tag; do
+            docker tag fhem-signal-candidate:test "$tag"
+            docker push "$tag"
+          done <<< "$TAGS"
+          first_tag="$(head -n 1 <<< "$TAGS")"
+          digest="$(docker buildx imagetools inspect "$first_tag" | awk '$1 == "Digest:" {print $2; exit}')"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Install cosign
+        if: steps.push.outcome == 'success'
+        uses: sigstore/cosign-installer@v3.9.2
+        with:
+          cosign-release: 'v2.6.1'
+      - name: Sign published image
+        if: steps.push.outcome == 'success'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+      - name: Mark successful publication
+        if: steps.push.outcome == 'success'
+        run: cp .build/dependencies.json .build/published.json
+      - name: Save successful publication marker
+        if: steps.push.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .build/published.json
+          key: published-amd64-${{ steps.deps.outputs.fingerprint }}
+
+  propose-base-update:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Propose new FHEM image generation or Debian release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 scripts/propose-base-update.py
