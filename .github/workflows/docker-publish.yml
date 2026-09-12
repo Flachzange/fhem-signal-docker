@@ -30,6 +30,7 @@ jobs:
       - name: Test dependency parsing and shell syntax
         run: |
           python3 scripts/test-resolver.py
+          python3 scripts/test-report-image-changes.py
           bash -n pre-start.sh
           bash -n scripts/install-signal.sh
           bash -n scripts/smoke-test.sh
@@ -53,6 +54,13 @@ jobs:
           path: .build/published.json
           key: published-automated-amd64-${{ steps.deps.outputs.fingerprint }}
           lookup-only: true
+      - name: Restore previous successful publication manifest
+        uses: actions/cache/restore@v4
+        with:
+          path: .build/published.json
+          key: previous-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            published-automated-amd64-
       - name: Decide whether to build
         id: decide
         env:
@@ -66,6 +74,9 @@ jobs:
             echo 'build=false' >> "$GITHUB_OUTPUT"
             echo 'Dependencies unchanged since successful publication.' >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Summarize unchanged publication
+        if: steps.decide.outputs.build != 'true'
+        run: python3 scripts/report-image-changes.py
       - name: Build candidate locally
         if: steps.decide.outputs.build == 'true'
         uses: docker/build-push-action@v7
@@ -93,6 +104,14 @@ jobs:
         env:
           REPOSITORY: ${{ github.repository }}
         run: echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Summarize candidate changes
+        if: steps.decide.outputs.build == 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          python3 scripts/report-image-changes.py \
+            --current-image fhem-signal-candidate:test \
+            --previous-image "$IMAGE:automated"
       - name: Extract image tags
         id: meta
         if: steps.decide.outputs.build == 'true'
