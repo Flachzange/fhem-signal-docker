@@ -76,6 +76,18 @@ class DecidePublicationTests(unittest.TestCase):
         self.assertTrue(publish)
         self.assertIn("Perl/CPAN modules", details)
 
+    @patch.object(decide, "run_in_image")
+    def test_perl_inventory_parses_all_local_packages(self, run_in_image):
+        run_in_image.return_value = "Foo::Direct\t1.2\nBar::Transitive\t0.4\n"
+
+        modules = decide.perl_module_versions("candidate")
+
+        self.assertEqual(modules, {"Foo::Direct": "1.2", "Bar::Transitive": "0.4"})
+        program = run_in_image.call_args.args[2][-1]
+        self.assertIn("File::Find", program)
+        self.assertIn("packages_inside", program)
+        self.assertIn("/usr/src/app/3rdparty/lib/perl5", program)
+
     @patch.object(decide, "pull_image")
     @patch.object(decide, "image_state")
     def test_same_version_but_different_artifact_hash_requires_publish(self, image_state, _pull_image):
