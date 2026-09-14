@@ -31,6 +31,7 @@ jobs:
         run: |
           python3 scripts/test-resolver.py
           python3 scripts/test-report-image-changes.py
+          python3 scripts/test-decide-publication.py
           bash -n pre-start.sh
           bash -n scripts/install-signal.sh
           bash -n scripts/smoke-test.sh
@@ -72,7 +73,7 @@ jobs:
             echo 'build=true' >> "$GITHUB_OUTPUT"
           else
             echo 'build=false' >> "$GITHUB_OUTPUT"
-            echo 'Dependencies unchanged since successful publication.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Dependency fingerprint already checked; no rebuild required.' >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Summarize unchanged publication
         if: steps.decide.outputs.build != 'true'
@@ -119,9 +120,18 @@ jobs:
           python3 scripts/report-image-changes.py \
             --current-image fhem-signal-candidate:test \
             --previous-image "$IMAGE:automated"
+      - name: Decide whether to publish candidate
+        id: changes
+        if: steps.decide.outputs.build == 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          python3 scripts/decide-publication.py \
+            --current-image fhem-signal-candidate:test \
+            --previous-image "$IMAGE:automated"
       - name: Extract image tags
         id: meta
-        if: steps.decide.outputs.build == 'true'
+        if: steps.decide.outputs.build == 'true' && (steps.changes.outputs.publish == 'true' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image.outputs.name }}
@@ -131,7 +141,7 @@ jobs:
             type=raw,value=automated-build-${{ steps.deps.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
           flavor: latest=false
       - name: Validate isolated publication tags
-        if: steps.decide.outputs.build == 'true'
+        if: steps.decide.outputs.build == 'true' && (steps.changes.outputs.publish == 'true' || startsWith(github.ref, 'refs/tags/v'))
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           IMAGE: ${{ steps.image.outputs.name }}
@@ -145,7 +155,7 @@ jobs:
           done <<< "$TAGS"
       - name: Publish the tested candidate
         id: push
-        if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: steps.decide.outputs.build == 'true' && (steps.changes.outputs.publish == 'true' || startsWith(github.ref, 'refs/tags/v')) && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
@@ -171,8 +181,8 @@ jobs:
       - name: Mark successful publication
         if: steps.push.outcome == 'success'
         run: cp .build/dependencies.json .build/published.json
-      - name: Save successful publication marker
-        if: steps.push.outcome == 'success'
+      - name: Save successful publication or verification marker
+        if: steps.decide.outputs.build == 'true' && steps.published.outputs.cache-hit != 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && (steps.push.outcome == 'success' || (github.ref == 'refs/heads/main' && steps.changes.outputs.publish == 'false'))
         uses: actions/cache/save@v4
         with:
           path: .build/published.json
