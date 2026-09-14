@@ -9,25 +9,6 @@ import subprocess
 import sys
 
 
-PERL_MODULES = (
-    "Readonly::XS",
-    "List::MoreUtils",
-    "Crypt::Rijndael",
-    "Crypt::Random",
-    "Crypt::Bcrypt",
-    "Crypt::PBKDF2",
-    "LWP::UserAgent",
-    "MIME::Base64",
-    "Time::HiRes",
-    "Digest::MD5",
-    "base",
-    "IO::File",
-    "Net::SIP",
-    "Protocol::DBus",
-    "Math::Round",
-    "AI::FANN",
-)
-
 RUNTIME_FILES = (
     "/docker/pre-start.sh",
     "/etc/dbus-1/system.d/org.asamk.Signal.conf",
@@ -104,31 +85,40 @@ def package_versions(image):
 
 
 def perl_module_versions(image):
-    # Read versions from module source metadata instead of requiring the modules.
-    # Requiring XS modules can fail while merely inspecting an older image if an
-    # optional/transitive runtime dependency is not loadable in the probe process.
-    module_list = " ".join(PERL_MODULES)
+    # Inventory every Perl package installed by cpm in the contained local-lib,
+    # including transitive dependencies. Read source metadata without requiring
+    # modules so XS/native code is never loaded merely for comparison.
     program = (
-        "use Module::Metadata; "
-        f"my @modules = qw({module_list}); "
-        "for my $module (@modules) { "
-        "my $info = Module::Metadata->new_from_module($module); "
-        "die \"$module: metadata not found\\n\" unless $info; "
-        "my $version = $info->version; "
+        "use File::Find; use Module::Metadata; "
+        "my $root = '/usr/src/app/3rdparty/lib/perl5'; "
+        "my %versions; "
+        "die \"Perl local-lib not found: $root\\n\" unless -d $root; "
+        "find({ no_chdir => 1, wanted => sub { "
+        "return unless -f $_ && /\\.pm\\z/; "
+        "my $info = Module::Metadata->new_from_file($_); "
+        "return unless $info; "
+        "for my $package ($info->packages_inside) { "
+        "my $version = $info->version($package); "
         "$version = 'unknown' unless defined $version; "
-        "print \"$module\\t$version\\n\"; "
+        "$versions{$package} = $version; "
+        "} "
+        "}}, $root); "
+        "for my $package (sort keys %versions) { "
+        "print \"$package\\t$versions{$package}\\n\"; "
         "}"
     )
     output = run_in_image(
         image,
         "/usr/bin/perl",
-        ["-I", "/usr/src/app/3rdparty/lib/perl5", "-e", program],
+        ["-e", program],
     )
     result = {}
     for line in output.splitlines():
         if line.strip():
             name, version = line.split("\t", 1)
             result[name] = version
+    if not result:
+        raise RuntimeError(f"no Perl/CPAN modules found in {image}")
     return result
 
 
@@ -232,18 +222,19 @@ def code(value):
 def summary(publish_required, details):
     lines = ["## Publication decision", ""]
     if publish_required:
-        lines.append("**Publish required: yes.** Meaningful runtime changes were detected.")
+        lines.append("**Publish required: yes.** Meaningful tracked runtime changes were detected.")
     else:
         lines.append(
-            "**Publish required: no.** The tested candidate is runtime-equivalent to the "
-            "currently published image, so `:automated` will not be moved."
+            "**Publish required: no.** No tracked runtime changes were detected, so "
+            "`:automated` will not be moved."
         )
     lines.append("")
 
     if not publish_required:
         lines.append(
-            "Checked: runtime dependency artifacts, Debian package versions, Perl/CPAN module "
-            "versions, custom runtime file content/permissions, and container runtime configuration."
+            "Checked: exact runtime dependency artifacts, Debian package versions, all Perl/CPAN "
+            "packages in the contained local-lib (including transitive dependencies), custom runtime "
+            "file content/permissions, and container runtime configuration."
         )
         lines.append("")
         return "\n".join(lines) + "\n"
