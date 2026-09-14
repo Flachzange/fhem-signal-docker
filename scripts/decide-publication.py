@@ -79,11 +79,13 @@ def changes(previous, current):
 def run_in_image(image, entrypoint, args):
     result = subprocess.run(
         ["docker", "run", "--rm", "--network", "none", "--entrypoint", entrypoint, image, *args],
-        check=True,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or f"exit status {result.returncode}"
+        raise RuntimeError(f"{entrypoint} failed in {image}: {detail}")
     return result.stdout
 
 
@@ -102,13 +104,17 @@ def package_versions(image):
 
 
 def perl_module_versions(image):
+    # Read versions from module source metadata instead of requiring the modules.
+    # Requiring XS modules can fail while merely inspecting an older image if an
+    # optional/transitive runtime dependency is not loadable in the probe process.
     module_list = " ".join(PERL_MODULES)
     program = (
+        "use Module::Metadata; "
         f"my @modules = qw({module_list}); "
         "for my $module (@modules) { "
-        "eval \"require $module; 1\" or die \"$module: $@\"; "
-        "no strict 'refs'; "
-        "my $version = ${\"${module}::VERSION\"}; "
+        "my $info = Module::Metadata->new_from_module($module); "
+        "die \"$module: metadata not found\\n\" unless $info; "
+        "my $version = $info->version; "
         "$version = 'unknown' unless defined $version; "
         "print \"$module\\t$version\\n\"; "
         "}"
@@ -149,11 +155,13 @@ def runtime_file_fingerprints(image):
 def image_config(image):
     result = subprocess.run(
         ["docker", "image", "inspect", image, "--format", "{{json .Config}}"],
-        check=True,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or f"exit status {result.returncode}"
+        raise RuntimeError(f"docker image inspect failed for {image}: {detail}")
     config = json.loads(result.stdout)
     keys = (
         "Env",
