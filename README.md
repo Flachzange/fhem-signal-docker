@@ -73,7 +73,7 @@ Checks run without network access or production volumes:
 
 - Java and signal-cli startup.
 - Real libsignal JNI key generation and serialization round trip.
-- Loading Protocol::DBus and AI::FANN in Perl.
+- Loading Protocol::DBus, AI::FANN and FFI::Platypus in Perl.
 - The actual pre-start hook and Signal D-Bus introspection with empty temporary data.
 
 These are compatibility smoke tests, not a test of message delivery or of every
