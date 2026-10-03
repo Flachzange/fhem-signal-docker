@@ -3,7 +3,7 @@ set -euo pipefail
 /opt/java/bin/java --version
 /opt/signal/bin/signal-cli --version
 /opt/java/bin/java -cp '/opt/signal/lib/*' /checks/LibsignalSmoke.java
-perl -I /usr/src/app/3rdparty/lib/perl5 -MProtocol::DBus -MAI::FANN -e 'print "Perl modules load\n"'
+perl -I /usr/src/app/3rdparty/lib/perl5 -MProtocol::DBus -MAI::FANN -MFFI::Platypus -e 'print "Perl modules load\n"'
 # The base entrypoint normally creates fhem. This offline test bypasses that
 # entrypoint to avoid its FHEM bootstrap downloads, so reproduce the user setup.
 getent group fhem >/dev/null || groupadd --system fhem
